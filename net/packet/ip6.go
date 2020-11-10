@@ -22,3 +22,5 @@ func (ip IP6) Netaddr() netaddr.IP {
 func (ip IP6) String() string {
 	return ip.Netaddr().String()
 }
+
+const ip6HeaderLength = 40

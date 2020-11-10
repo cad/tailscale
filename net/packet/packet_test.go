@@ -9,7 +9,25 @@ import (
 	"net"
 	"reflect"
 	"testing"
+
+	"inet.af/netaddr"
 )
+
+func mustIP4(s string) IP4 {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panic(err)
+	}
+	return IP4FromNetaddr(ip)
+}
+
+func mustIP6(s string) IP6 {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panic(err)
+	}
+	return IP6FromNetaddr(ip)
+}
 
 func TestIP4String(t *testing.T) {
 	const str = "1.2.3.4"
@@ -48,9 +66,9 @@ var icmpRequestDecode = Parsed{
 	length:  len(icmpRequestBuffer),
 
 	IPVersion: 4,
-	IPProto:   ICMP,
-	SrcIP4:    NewIP4(net.ParseIP("1.2.3.4")),
-	DstIP4:    NewIP4(net.ParseIP("5.6.7.8")),
+	IPProto:   ICMPv4,
+	SrcIP4:    mustIP4("1.2.3.4"),
+	DstIP4:    mustIP4("5.6.7.8"),
 	SrcPort:   0,
 	DstPort:   0,
 }
@@ -74,9 +92,9 @@ var icmpReplyDecode = Parsed{
 	length:  len(icmpReplyBuffer),
 
 	IPVersion: 4,
-	IPProto:   ICMP,
-	SrcIP4:    NewIP4(net.ParseIP("1.2.3.4")),
-	DstIP4:    NewIP4(net.ParseIP("5.6.7.8")),
+	IPProto:   ICMPv4,
+	SrcIP4:    mustIP4("1.2.3.4"),
+	DstIP4:    mustIP4("5.6.7.8"),
 	SrcPort:   0,
 	DstPort:   0,
 }
@@ -93,8 +111,13 @@ var ipv6PacketBuffer = []byte{
 
 var ipv6PacketDecode = Parsed{
 	b:         ipv6PacketBuffer,
+	subofs:    40,
+	dataofs:   44,
+	length:    len(ipv6PacketBuffer),
 	IPVersion: 6,
 	IPProto:   ICMPv6,
+	SrcIP6:    mustIP6("fe80::fb57:1dea:9c39:8fb7"),
+	DstIP6:    mustIP6("ff02::2"),
 }
 
 // This is a malformed IPv4 packet.
@@ -131,8 +154,8 @@ var tcpPacketDecode = Parsed{
 
 	IPVersion: 4,
 	IPProto:   TCP,
-	SrcIP4:    NewIP4(net.ParseIP("1.2.3.4")),
-	DstIP4:    NewIP4(net.ParseIP("5.6.7.8")),
+	SrcIP4:    mustIP4("1.2.3.4"),
+	DstIP4:    mustIP4("5.6.7.8"),
 	SrcPort:   123,
 	DstPort:   567,
 	TCPFlags:  TCPSynAck,
@@ -159,8 +182,8 @@ var udpRequestDecode = Parsed{
 
 	IPVersion: 4,
 	IPProto:   UDP,
-	SrcIP4:    NewIP4(net.ParseIP("1.2.3.4")),
-	DstIP4:    NewIP4(net.ParseIP("5.6.7.8")),
+	SrcIP4:    mustIP4("1.2.3.4"),
+	DstIP4:    mustIP4("5.6.7.8"),
 	SrcPort:   123,
 	DstPort:   567,
 }
@@ -185,8 +208,8 @@ var udpReplyDecode = Parsed{
 	length:  len(udpReplyBuffer),
 
 	IPProto: UDP,
-	SrcIP4:  NewIP4(net.ParseIP("1.2.3.4")),
-	DstIP4:  NewIP4(net.ParseIP("5.6.7.8")),
+	SrcIP4:  mustIP4("1.2.3.4"),
+	DstIP4:  mustIP4("5.6.7.8"),
 	SrcPort: 567,
 	DstPort: 123,
 }
@@ -198,9 +221,9 @@ func TestParsed(t *testing.T) {
 		want    string
 	}{
 		{"tcp", tcpPacketDecode, "TCP{1.2.3.4:123 > 5.6.7.8:567}"},
-		{"icmp", icmpRequestDecode, "ICMP{1.2.3.4:0 > 5.6.7.8:0}"},
+		{"icmp", icmpRequestDecode, "ICMPv4{1.2.3.4:0 > 5.6.7.8:0}"},
 		{"unknown", unknownPacketDecode, "Unknown{???}"},
-		{"ipv6", ipv6PacketDecode, "IPv6{Proto=58}"},
+		{"ipv6", ipv6PacketDecode, "ICMPv6{[fe80::fb57:1dea:9c39:8fb7]:0 > [ff02::2]:0}"},
 	}
 
 	for _, tt := range tests {
@@ -280,8 +303,8 @@ func TestMarshalRequest(t *testing.T) {
 	var small [20]byte
 	var large [64]byte
 
-	icmpHeader := icmpRequestDecode.ICMPHeader()
-	udpHeader := udpRequestDecode.UDPHeader()
+	icmpHeader := icmpRequestDecode.ICMP4Header()
+	udpHeader := udpRequestDecode.UDP4Header()
 	tests := []struct {
 		name   string
 		header Header
@@ -317,8 +340,8 @@ func TestMarshalRequest(t *testing.T) {
 func TestMarshalResponse(t *testing.T) {
 	var buf [64]byte
 
-	icmpHeader := icmpRequestDecode.ICMPHeader()
-	udpHeader := udpRequestDecode.UDPHeader()
+	icmpHeader := icmpRequestDecode.ICMP4Header()
+	udpHeader := udpRequestDecode.UDP4Header()
 
 	tests := []struct {
 		name   string
